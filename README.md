@@ -1,3 +1,5 @@
+correction de bug en cours pour la prochaine saison
+
 **MotoGP Tracker :**
 
 MotoGP Tracker est une intégration personnalisée pour Home Assistant permettant d’afficher les données officielles MotoGP directement dans votre tableau de bord.
