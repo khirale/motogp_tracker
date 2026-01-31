@@ -1,5 +1,15 @@
 correction de bug en cours pour la prochaine saison
 
+<p align="center">
+  <a href="https://buymeacoffee.com/khirale">
+    <img
+      src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+      alt="Buy Me a Coffee"
+      height="45"
+    >
+  </a>
+</p>
+
 **MotoGP Tracker :**
 
 MotoGP Tracker est une intégration personnalisée pour Home Assistant permettant d’afficher les données officielles MotoGP directement dans votre tableau de bord.
