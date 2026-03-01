@@ -1,4 +1,13 @@
-correction de bug en cours pour la prochaine saison
+# MotoGP Tracker — Home Assistant Integration
+
+<p align="center">
+  <img src="https://img.shields.io/badge/HACS-Custom-orange?style=for-the-badge" alt="HACS Custom">
+  <img src="https://img.shields.io/badge/HA-2024.1+-blue?style=for-the-badge" alt="HA Version">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+</p>
+
+---
+
 
 <p align="center">
   <a href="https://buymeacoffee.com/khirale">
@@ -10,129 +19,133 @@ correction de bug en cours pour la prochaine saison
   </a>
 </p>
 
-**MotoGP Tracker :**
 
-MotoGP Tracker est une intégration personnalisée pour Home Assistant permettant d’afficher les données officielles MotoGP directement dans votre tableau de bord.
-Elle fournit le live timing, les classements pilotes et équipes, les prochaines sessions et les informations sur le prochain Grand Prix.
-Toutes les données proviennent de l’API officielle MotoGP Pulse Live.
+## 🇬🇧 English
 
-Source API : https://api.motogp.pulselive.com/motogp/v1
+### What it does
 
-**Fonctionnalités :**
+MotoGP Tracker integrates live MotoGP data into Home Assistant via the official Pulselive API.  
+**No API key required.**
 
-- Classement en direct des courses
+#### 6 sensors provided
 
-- Informations sur le prochain Grand Prix et les sessions à venir
+| Sensor | State | Key attributes |
+|--------|-------|----------------|
+| `sensor.motogp_prochain_evenement` | GP name | flag_url, circuit_name, circuit_svg, dates |
+| `sensor.motogp_depart_course` | Race start (Paris time) | start_utc, session_status, race_uuid |
+| `sensor.motogp_sessions` | Session count | sessions list (type, start_local, status) |
+| `sensor.motogp_classement_pilotes` | Leader name | standings (position, full_name, country_iso, team, points, wins) |
+| `sensor.motogp_classement_equipes` | Leader team | standings (position, name, points) |
+| `sensor.motogp_live_timing` | Session status | active, classification, current_lap, total_laps |
 
-- Classements pilotes et équipes
+#### Update intervals
 
-- Actualisation automatique des données
+| Data | Interval |
+|------|----------|
+| Season / Category | 6 hours |
+| Rider standings | 3 hours |
+| Next event + sessions | 1 hour |
+| Live timing | 30 seconds |
 
-- Configuration complète via l’interface Home Assistant
+Live timing only polls the API when a race UUID is available. Outside race weekends, no unnecessary calls are made.
 
-- Images de circuits affichables depuis le dossier www/motogp/
+### Requirements
 
-**Installation :**
+- Home Assistant 2024.1 or later
+- Internet access to `api.motogp.pulselive.com`
 
-- Option 1 – via HACS (recommandé)
+### Installation via HACS
 
-    Ouvrir HACS dans Home Assistant.
+1. In HACS → **Integrations** → ⋮ → **Custom repositories**
+2. URL: `https://github.com/khirale/motogp_tracker` — Category: **Integration**
+3. Click **Download** then restart Home Assistant
+4. **Settings → Devices & Services → Add Integration** → search **MotoGP Tracker**
 
-    Aller dans Intégrations → “+ Explorer et télécharger les dépôts”.
+### Manual installation
 
-    Rechercher “MotoGP Tracker”.
+1. Copy `custom_components/motogp_tracker/` to your HA config directory
+2. Restart Home Assistant
+3. Add the integration via **Settings → Devices & Services**
 
-    Télécharger puis redémarrer Home Assistant.
+### Dashboard cards
 
-- Option 2 – installation manuelle
+Companion Lovelace cards are available as a separate HACS Frontend resource:  
+👉 [github.com/khirale/motogp-cards](https://github.com/khirale/motogp-cards)
 
-    Copier le dossier motogp_tracker dans custom_components.
+### Services
 
-    Copier le dossier motogp dans www/.
+| Service | Description |
+|---------|-------------|
+| `motogp_tracker.refresh_config` | Force refresh season & category |
+| `motogp_tracker.refresh_standings` | Force refresh rider standings |
+| `motogp_tracker.refresh_event` | Force refresh next event & sessions |
+| `motogp_tracker.refresh_live` | Force refresh live timing |
 
-    Redémarrer Home Assistant.
+---
 
-**Configuration :**
+## 🇫🇷 Français
 
-- Aller dans Paramètres → Appareils et services → Ajouter une intégration.
+### Ce que ça fait
 
-- Rechercher “MotoGP Tracker”.
+MotoGP Tracker intègre les données MotoGP en temps réel dans Home Assistant via l'API officielle Pulselive.  
+**Aucune clé API requise.**
 
-- Suivre les étapes de configuration.
-  Aucune configuration YAML n’est requise.
+#### 6 capteurs fournis
 
- **Capteurs créés :**
+| Capteur | État | Attributs clés |
+|---------|------|----------------|
+| `sensor.motogp_prochain_evenement` | Nom du GP | flag_url, circuit_name, circuit_svg, dates |
+| `sensor.motogp_depart_course` | Heure départ (Paris) | start_utc, session_status, race_uuid |
+| `sensor.motogp_sessions` | Nombre de sessions | liste sessions (type, start_local, status) |
+| `sensor.motogp_classement_pilotes` | Nom du leader | standings (position, full_name, country_iso, team, points, wins) |
+| `sensor.motogp_classement_equipes` | Équipe leader | standings (position, name, points) |
+| `sensor.motogp_live_timing` | Statut session | active, classification, current_lap, total_laps |
 
-- sensor.motogp_configuration — Informations internes de configuration
+#### Intervalles de mise à jour
 
-- sensor.motogp_teams_standings — Classement des équipes
+| Données | Intervalle |
+|---------|-----------|
+| Saison / Catégorie | 6 heures |
+| Classement pilotes | 3 heures |
+| Prochain événement + sessions | 1 heure |
+| Live timing | 30 secondes |
 
- -sensor.motogp_live_timing — Données en direct de la course
+Le live timing n'interroge l'API que si un UUID de course est disponible. En dehors des week-ends de GP, aucun appel inutile n'est effectué.
 
-- sensor.motogp_next_sessions — Sessions à venir
+### Prérequis
 
-- sensor.motogp_standings — Classement pilotes
+- Home Assistant 2024.1 ou supérieur
+- Accès Internet vers `api.motogp.pulselive.com`
 
-- sensor.motogp_next_event — Détails du prochain Grand Prix
+### Installation via HACS
 
-- sensor.motogp_next_race_start — Compte à rebours avant la course
+1. Dans HACS → **Intégrations** → ⋮ → **Dépôts personnalisés**
+2. URL : `https://github.com/khirale/motogp_tracker` — Catégorie : **Intégration**
+3. Cliquer **Télécharger** puis redémarrer Home Assistant
+4. **Paramètres → Appareils et services → Ajouter une intégration** → chercher **MotoGP Tracker**
 
-**Images des circuits :**
+### Installation manuelle
 
-Pour afficher les images des circuits dans vos cartes ou capteurs HTML, placez-les dans :
-/config/www/motogp/
+1. Copier `custom_components/motogp_tracker/` dans votre répertoire de config HA
+2. Redémarrer Home Assistant
+3. Ajouter l'intégration via **Paramètres → Appareils et services**
 
-Elles seront accessibles dans Home Assistant via :
-/local/motogp/<nom_image>.png
+### Cartes dashboard
 
-Exemple :
-/config/www/motogp/losail.png → /local/motogp/losail.png
+Des cartes Lovelace compagnon sont disponibles comme ressource HACS Frontend séparée :  
+👉 [github.com/khirale/motogp-cards](https://github.com/khirale/motogp-cards)
 
-**Détails techniques :**
+### Services
 
-- Nom de l’intégration : motogp_tracker
-- Domaine : motogp_tracker
-- Plateforme : sensor
-- Dépendances : aucune
-- API : https://api.motogp.pulselive.com/motogp/v1
+| Service | Description |
+|---------|-------------|
+| `motogp_tracker.refresh_config` | Forcer le rafraîchissement saison/catégorie |
+| `motogp_tracker.refresh_standings` | Forcer le rafraîchissement du classement |
+| `motogp_tracker.refresh_event` | Forcer le rafraîchissement du prochain événement |
+| `motogp_tracker.refresh_live` | Forcer le rafraîchissement du live timing |
 
-Intervalle de mise à jour : défini dans la constante UPDATE_INTERVAL_CONFIG
+---
 
-**Structure du dossier :**
+## License
 
-custom_components/motogp_tracker
-
-├── init.py
-
-├── config_flow.py
-
-├── const.py
-
-├── entity.py
-
-├── manifest.json
-
-├── sensor.py
-
-└── translations
-
-  ├── en.json
-  
-  └── fr.json
-
-www/motogp
-
-├── losail.png
-
-├── jerez.png
-
-├── mugello.png
-
-└── ... (une par circuit)
-
-**Crédits :**
-
-- Développé par Khirale
-- Données fournies par MotoGP Pulse Live API
-
-Licence : MIT
+MIT © 2026 khirale
