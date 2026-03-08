@@ -1,50 +1,37 @@
-"""Constantes pour l'intégration MotoGP Tracker."""
 from datetime import timedelta
 
 DOMAIN = "motogp_tracker"
 
-# ── API ───────────────────────────────────────────────────────────────────────
 BASE_URL = "https://api.motogp.pulselive.com/motogp/v1"
 
-# ── Intervalles de mise à jour ────────────────────────────────────────────────
-INTERVAL_CONFIG    = timedelta(hours=6)    # saison + categorie
-INTERVAL_STANDINGS = timedelta(hours=3)    # classements pilotes/equipes
-INTERVAL_EVENT     = timedelta(hours=1)    # prochain GP + sessions
-INTERVAL_LIVE      = timedelta(seconds=30) # live timing (conditionnel)
+INTERVAL_CONFIG    = timedelta(hours=6)
+INTERVAL_STANDINGS = timedelta(hours=3)
+INTERVAL_EVENT     = timedelta(hours=1)
+INTERVAL_LIVE      = timedelta(seconds=30)
 
-# ── Localisation ──────────────────────────────────────────────────────────────
 TZ_PARIS = "Europe/Paris"
 
-# ── Cle de stockage dans hass.data[DOMAIN][entry.entry_id] ───────────────────
 KEY_COORDINATORS = "coordinators"
 
-# ── Noms des coordinateurs (cles du dict KEY_COORDINATORS) ───────────────────
 COORD_CONFIG    = "config"
 COORD_STANDINGS = "standings"
 COORD_EVENT     = "event"
 COORD_LIVE      = "live"
 
-# ── Sessions ──────────────────────────────────────────────────────────────────
-# Types de sessions retenus (WUP et autres ignores)
 SESSION_TYPES_KEPT = {"FP", "PR", "Q", "SPR", "RAC"}
 
-# Statuts de session consideres "en cours" (champ session_status_name du live)
 LIVE_STATUSES = {"started", "on track", "formation lap", "warm up lap", "in progress", "live"}
 
-# ── Circuits ──────────────────────────────────────────────────────────────────
-# Fichiers SVG : /local/motogp/circuits/{slug}-info.svg
 CIRCUIT_SVG_PATH = "/local/motogp/circuits/{slug}-info.svg"
 
-# Mapping : nom de circuit API (lowercase) -> slug SVG
-# Source des noms : logs API reels 2026
 CIRCUIT_SLUGS: dict[str, str] = {
-    # Jerez — l'API retourne "Circuito de Jerez - Angel Nieto" avec accent sur Angel
+
     "circuito de jerez - angel nieto":                    "jerez",
-    "circuito de jerez - \u00e1ngel nieto":               "jerez",   # Angel avec accent A
-    # Le Mans — l'API retourne "Le Mans" en 2026 (pas "Circuit Bugatti")
+    "circuito de jerez - \u00e1ngel nieto":               "jerez",
+
     "le mans":                                            "lemans",
-    "circuit bugatti":                                    "lemans",   # ancien nom conserve
-    # Autres circuits confirmes via logs API 2026
+    "circuit bugatti":                                    "lemans",
+
     "circuit de barcelona-catalunya":                     "catalunya",
     "circuit ricardo tormo":                              "valencia",
     "autodromo internazionale del mugello":               "mugello",
@@ -70,6 +57,5 @@ CIRCUIT_SLUGS: dict[str, str] = {
     "motorland aragon":                                   "aragon",
     "automotodrom brno":                                  "cze",
     "balaton park circuit":                               "balaton",
-    # Brésil 2026 — nouveau circuit, pas de SVG disponible
-    # "autódromo internacional de goiânia - ayrton senna": "",
+    "autódromo internacional de goiânia - ayrton senna":  "goiania",
 }

@@ -1,4 +1,3 @@
-"""Capteurs MotoGP Tracker."""
 from __future__ import annotations
 
 import logging
@@ -19,11 +18,6 @@ from .coordinator import (
 
 _LOGGER = logging.getLogger(__name__)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SETUP
-# ──────────────────────────────────────────────────────────────────────────────
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -40,13 +34,7 @@ async def async_setup_entry(
         MotoGPLiveTimingSensor(coords[COORD_LIVE]),
     ])
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# CLASSE DE BASE
-# ──────────────────────────────────────────────────────────────────────────────
-
 class _MotoGPSensor(CoordinatorEntity, SensorEntity):
-    """Classe de base : CoordinatorEntity + SensorEntity."""
 
     _attr_should_poll = False
 
@@ -57,13 +45,6 @@ class _MotoGPSensor(CoordinatorEntity, SensorEntity):
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success and self.coordinator.data is not None
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 1 : PROCHAIN ÉVÉNEMENT
-# state      = nom du GP  ex: "Grand Prix de France"
-# attributs  = toutes les infos nécessaires au dashboard
-# ──────────────────────────────────────────────────────────────────────────────
 
 class MotoGPNextEventSensor(_MotoGPSensor):
 
@@ -98,13 +79,6 @@ class MotoGPNextEventSensor(_MotoGPSensor):
             "circuit_svg":      event["circuit_svg"],
         }
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 2 : HEURE DE DÉPART COURSE
-# state     = "2025-05-18 14:00"  (heure Paris)
-# Utile pour : trigger d'automations, affichage simple
-# ──────────────────────────────────────────────────────────────────────────────
-
 class MotoGPNextRaceStartSensor(_MotoGPSensor):
 
     _attr_name = "MotoGP Départ Course"
@@ -131,13 +105,6 @@ class MotoGPNextRaceStartSensor(_MotoGPSensor):
             "race_uuid":      (self.coordinator.data or {}).get("race_uuid"),
         }
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 3 : SESSIONS DU WEEK-END
-# state     = "5 sessions"
-# attributs = liste complète des sessions + race_uuid
-# ──────────────────────────────────────────────────────────────────────────────
-
 class MotoGPSessionsSensor(_MotoGPSensor):
 
     _attr_name = "MotoGP Sessions"
@@ -157,18 +124,8 @@ class MotoGPSessionsSensor(_MotoGPSensor):
         return {
             "race_uuid": data.get("race_uuid"),
             "sessions":  data.get("sessions", []),
-            # Chaque session :
-            # { id, type, start_utc, start_local, status }
-            # type: FP | PR | Q | SPR | RAC
-            # status: ex UPCOMING, COMPLETED, ONGOING
+
         }
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 4 : CLASSEMENT PILOTES
-# state     = nom du leader  ex: "Marc Marquez"
-# attributs = liste complète
-# ──────────────────────────────────────────────────────────────────────────────
 
 class MotoGPRiderStandingsSensor(_MotoGPSensor):
 
@@ -190,17 +147,8 @@ class MotoGPRiderStandingsSensor(_MotoGPSensor):
             "season_year": data.get("season_year"),
             "count":       len(data.get("riders", [])),
             "standings":   data.get("riders", []),
-            # Chaque rider :
-            # { position, full_name, number, country_iso, country_name,
-            #   team, points, wins, podiums }
+
         }
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 5 : CLASSEMENT ÉQUIPES
-# state     = nom de l'équipe leader
-# attributs = liste complète (calculée depuis classement pilotes)
-# ──────────────────────────────────────────────────────────────────────────────
 
 class MotoGPTeamStandingsSensor(_MotoGPSensor):
 
@@ -222,16 +170,8 @@ class MotoGPTeamStandingsSensor(_MotoGPSensor):
             "season_year": data.get("season_year"),
             "count":       len(data.get("teams", [])),
             "standings":   data.get("teams", []),
-            # Chaque team :
-            # { position, name, points }
+
         }
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SENSOR 6 : LIVE TIMING
-# state     = statut de session  ex: "started" / "inactive"
-# attributs = classement complet + infos de course
-# ──────────────────────────────────────────────────────────────────────────────
 
 class MotoGPLiveTimingSensor(_MotoGPSensor):
 
@@ -254,8 +194,5 @@ class MotoGPLiveTimingSensor(_MotoGPSensor):
             "current_lap":    data.get("current_lap"),
             "race_uuid":      data.get("race_uuid"),
             "classification": data.get("classification", []),
-            # Chaque pilote :
-            # { pos, number, name, nation, team, bike,
-            #   laps, gap_first, last_lap, status }
-            # status: "CL" classé, "RT" retraité
+
         }

@@ -1,4 +1,3 @@
-"""Coordinateurs de données MotoGP Tracker."""
 from __future__ import annotations
 
 import logging
@@ -32,16 +31,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# UTILITAIRE : requête HTTP
-# ──────────────────────────────────────────────────────────────────────────────
-
 async def _fetch(endpoint: str, timeout: int = 20) -> Any:
-    """GET vers l'API Pulselive.
-    - Retourne None sur 404 (session inactive, pas une erreur).
-    - Logue l'URL appelée et le JSON brut reçu en DEBUG.
-    """
     url = f"{BASE_URL}/{endpoint}"
     _LOGGER.debug("[MotoGP API] --> GET %s", url)
     async with aiohttp.ClientSession(
@@ -56,13 +46,7 @@ async def _fetch(endpoint: str, timeout: int = 20) -> Any:
             _LOGGER.debug("[MotoGP API] <-- %s JSON: %s", url, data)
             return data
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# UTILITAIRE : conversion heure Paris
-# ──────────────────────────────────────────────────────────────────────────────
-
 def _to_paris(dt_str: str | None) -> str:
-    """Convertit une date ISO UTC en heure de Paris (YYYY-MM-DD HH:MM)."""
     if not dt_str:
         return "n/a"
     try:
@@ -71,14 +55,6 @@ def _to_paris(dt_str: str | None) -> str:
         return dt_utc.astimezone(tz).strftime("%Y-%m-%d %H:%M")
     except Exception:
         return "n/a"
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# COORDINATOR 1 : CONFIG
-# Frequence : 6h
-# Donnees   : season_id, season_year, category_id
-# Utilise par : StandingsCoordinator, EventCoordinator
-# ──────────────────────────────────────────────────────────────────────────────
 
 class MotoGPConfigCoordinator(DataUpdateCoordinator[dict]):
 
@@ -118,14 +94,6 @@ class MotoGPConfigCoordinator(DataUpdateCoordinator[dict]):
             "category_id": str(cat["id"]),
         }
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# COORDINATOR 2 : STANDINGS
-# Frequence : 3h
-# Donnees   : classement pilotes (brut API) + classement equipes (calcule)
-# Utilise par : MotoGPRiderStandingsSensor, MotoGPTeamStandingsSensor
-# ──────────────────────────────────────────────────────────────────────────────
-
 class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict]):
 
     def __init__(self, hass: HomeAssistant, config: MotoGPConfigCoordinator) -> None:
@@ -135,6 +103,7 @@ class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict]):
             update_interval=INTERVAL_STANDINGS,
         )
         self._config = config
+        self._riders_cache: dict[str, dict] = {}
 
     async def _async_update_data(self) -> dict:
         if not self._config.data:
@@ -150,12 +119,10 @@ class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:
             raise UpdateFailed(f"Standings inaccessibles : {err}") from err
 
-        # raw peut etre None (404) si pas encore de classement en debut de saison
         if raw is None:
             _LOGGER.debug("[MotoGP Standings] Pas de classement disponible (404)")
             return {"season_year": self._config.data["season_year"], "riders": [], "teams": []}
 
-        # --- Normalisation du format de reponse ---
         if isinstance(raw, dict) and "classification" in raw:
             riders_raw: list = raw["classification"]
         elif isinstance(raw, dict) and "items" in raw:
@@ -166,25 +133,26 @@ class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.warning("[MotoGP Standings] Format inattendu : %s", type(raw))
             riders_raw = []
 
-        # --- Normalisation pilotes ---
         riders: list[dict] = []
         for r in riders_raw:
             rider_info = r.get("rider") or {}
             team_info  = r.get("team") or {}
             country    = rider_info.get("country") or {}
             riders.append({
-                "position":    r.get("position"),
-                "full_name":   rider_info.get("full_name", ""),
-                "number":      str(rider_info.get("number", "")),
-                "country_iso": (country.get("iso", "") or "").lower(),
-                "country_name":country.get("name", ""),
-                "team":        team_info.get("name", ""),
-                "points":      r.get("points", 0),
-                "wins":        r.get("race_wins", 0),
-                "podiums":     r.get("podiums", 0),
+                "position":        r.get("position"),
+                "full_name":       rider_info.get("full_name", ""),
+                "number":          str(rider_info.get("number", "")),
+                "country_iso":     (country.get("iso", "") or "").lower(),
+                "country_name":    country.get("name", ""),
+                "team":            team_info.get("name", ""),
+                "points":          r.get("points", 0),
+                "wins":            r.get("race_wins", 0),
+                "podiums":         r.get("podiums", 0),
+                "sprint_wins":     r.get("sprint_wins", 0),
+                "sprint_podiums":  r.get("sprint_podiums", 0),
+                "riders_api_uuid": rider_info.get("riders_api_uuid", ""),
             })
 
-        # --- Calcul classement equipes ---
         teams_pts: dict[str, int] = {}
         for r in riders:
             team = r["team"] or "Unknown"
@@ -204,14 +172,53 @@ class MotoGPStandingsCoordinator(DataUpdateCoordinator[dict]):
             "teams":       teams,
         }
 
+    async def async_get_rider_profile(self, riders_api_uuid: str) -> dict | None:
+        if riders_api_uuid not in self._riders_cache:
+            try:
+                raw = await _fetch(f"riders/{riders_api_uuid}")
+            except Exception as err:
+                _LOGGER.warning("[MotoGP Rider] Profil inaccessible (%s) : %s", riders_api_uuid, err)
+                return None
 
-# ──────────────────────────────────────────────────────────────────────────────
-# COORDINATOR 3 : EVENT
-# Frequence : 1h
-# Donnees   : prochain GP + ses sessions
-# Utilise par : MotoGPNextEventSensor, MotoGPNextRaceStartSensor,
-#               MotoGPSessionsSensor + indirectement LiveCoordinator
-# ──────────────────────────────────────────────────────────────────────────────
+            if raw is None:
+                return None
+
+            self._riders_cache[riders_api_uuid] = raw
+            _LOGGER.debug("[MotoGP Rider] Profil mis en cache : %s", riders_api_uuid)
+
+        raw = self._riders_cache[riders_api_uuid]
+
+        photo_url = ""
+        for step in raw.get("career") or []:
+            if step.get("current"):
+                photo_url = (step.get("pictures") or {}).get("profile", {}).get("main") or ""
+                break
+
+        stats = {}
+        for r in (self.data or {}).get("riders", []):
+            if r.get("riders_api_uuid", "") == riders_api_uuid:
+                stats = r
+                break
+
+        country = raw.get("country") or {}
+        phys    = raw.get("physical_attributes") or {}
+
+        return {
+            "photo_url":     photo_url,
+            "age":           raw.get("years_old"),
+            "birth_city":    raw.get("birth_city", ""),
+            "height":        phys.get("height"),
+            "weight":        phys.get("weight"),
+            "country_iso":   (country.get("iso") or "").lower(),
+            "country_name":  country.get("name", ""),
+            "country_flag":  country.get("flag", ""),
+            "position":      stats.get("position"),
+            "points":        stats.get("points", 0),
+            "race_wins":     stats.get("wins", 0),
+            "podiums":       stats.get("podiums", 0),
+            "sprint_wins":   stats.get("sprint_wins", 0),
+            "sprint_podiums":stats.get("sprint_podiums", 0),
+        }
 
 class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
 
@@ -243,7 +250,6 @@ class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.info("[MotoGP Event] Aucun evenement a venir.")
             return {"event": None, "sessions": [], "race_uuid": None}
 
-        # --- Donnees de l'evenement ---
         circuit = event.get("circuit") or {}
         country = event.get("country") or {}
         cname   = (circuit.get("name") or circuit.get("place") or "").strip()
@@ -269,7 +275,6 @@ class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
             "circuit_svg":      CIRCUIT_SVG_PATH.format(slug=slug) if slug else "",
         }
 
-        # --- Sessions ---
         sessions, race_uuid = await self._fetch_sessions(event_data["uuid"], category_id)
 
         _LOGGER.info(
@@ -284,10 +289,6 @@ class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
 
     @staticmethod
     def _pick_next(events: list) -> dict | None:
-        """Retourne le prochain GP (hors tests).
-        Priorite a l'evenement CURRENT, sinon le plus proche a venir.
-        """
-        # On exclut systematiquement les sessions de test
         gps = [e for e in events if not e.get("test", False)]
 
         for e in gps:
@@ -313,7 +314,6 @@ class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
 
     @staticmethod
     async def _fetch_sessions(event_uuid: str, category_id: str) -> tuple[list[dict], str | None]:
-        """Recupere et normalise les sessions d'un evenement."""
         try:
             raw: list = await _fetch(
                 f"results/sessions?eventUuid={event_uuid}&categoryUuid={category_id}"
@@ -346,14 +346,6 @@ class MotoGPEventCoordinator(DataUpdateCoordinator[dict]):
         sessions.sort(key=lambda s: s.get("start_utc") or "")
         return sessions, race_uuid
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# COORDINATOR 4 : LIVE TIMING
-# Frequence : 30s — appel API conditionnel (seulement si race_uuid disponible)
-# Donnees   : classement complet tous pilotes + infos session
-# Utilise par : MotoGPLiveTimingSensor
-# ──────────────────────────────────────────────────────────────────────────────
-
 class MotoGPLiveTimingCoordinator(DataUpdateCoordinator[dict]):
 
     def __init__(self, hass: HomeAssistant, event: MotoGPEventCoordinator) -> None:
@@ -367,7 +359,6 @@ class MotoGPLiveTimingCoordinator(DataUpdateCoordinator[dict]):
     async def _async_update_data(self) -> dict:
         race_uuid = (self._event.data or {}).get("race_uuid")
 
-        # Pas de race_uuid = pas d'appel API
         if not race_uuid:
             return {
                 "active":         False,
@@ -383,7 +374,6 @@ class MotoGPLiveTimingCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:
             raise UpdateFailed(f"Live timing inaccessible : {err}") from err
 
-        # None = 404 = session pas encore demarree, c'est normal
         if raw is None:
             _LOGGER.debug("[MotoGP Live] 404 — session non demarree (race_uuid=%s)", race_uuid)
             return {
@@ -400,7 +390,6 @@ class MotoGPLiveTimingCoordinator(DataUpdateCoordinator[dict]):
         total_laps     = head.get("num_laps")
         is_active      = session_status in LIVE_STATUSES
 
-        # --- Normalisation des pilotes ---
         riders_raw = raw.get("rider") or {}
         classification: list[dict] = []
 

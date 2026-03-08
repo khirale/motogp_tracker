@@ -1,10 +1,9 @@
-"""MotoGP Tracker — intégration Home Assistant."""
 from __future__ import annotations
 
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -25,24 +24,16 @@ from .coordinator import (
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["sensor"]
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SETUP
-# ──────────────────────────────────────────────────────────────────────────────
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.data.setdefault(DOMAIN, {})
     return True
 
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
-    # 1. Config — bloquant : si ça rate, HA retentera automatiquement
     config_coord = MotoGPConfigCoordinator(hass)
     await config_coord.async_config_entry_first_refresh()
 
-    # 2. Standings + Event — best-effort (capteurs "unavailable" si échec)
     standings_coord = MotoGPStandingsCoordinator(hass, config_coord)
     event_coord     = MotoGPEventCoordinator(hass, config_coord)
 
@@ -52,10 +43,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as err:
             _LOGGER.warning("[MotoGP] Premier refresh %s échoué : %s", label, err)
 
-    # 3. Live — pas de premier refresh forcé (actif uniquement en course)
     live_coord = MotoGPLiveTimingCoordinator(hass, event_coord)
 
-    # 4. Stockage
     hass.data[DOMAIN][entry.entry_id] = {
         KEY_COORDINATORS: {
             COORD_CONFIG:    config_coord,
@@ -65,45 +54,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         }
     }
 
-    # 5. Plateformes
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # 6. Services
     _register_services(hass, entry)
 
     _LOGGER.info("[MotoGP] Intégration initialisée ✅")
     return True
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# UNLOAD / RELOAD
-# ──────────────────────────────────────────────────────────────────────────────
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         if not hass.data[DOMAIN]:
-            for svc in ("refresh_config", "refresh_standings", "refresh_event", "refresh_live"):
+            for svc in ("refresh_config", "refresh_standings", "refresh_event", "refresh_live", "get_rider_profile"):
                 if hass.services.has_service(DOMAIN, svc):
                     hass.services.async_remove(DOMAIN, svc)
     return unload_ok
-
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SERVICES
-# Ces services permettent de forcer un rafraîchissement depuis une automation
-# ou un appui de bouton dans le dashboard.
-# ──────────────────────────────────────────────────────────────────────────────
-
 def _register_services(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if hass.services.has_service(DOMAIN, "refresh_config"):
-        return  # déjà enregistrés (multi-entries protection)
+        return
 
     def _coords() -> dict:
         return hass.data[DOMAIN][entry.entry_id][KEY_COORDINATORS]
@@ -123,8 +97,20 @@ def _register_services(hass: HomeAssistant, entry: ConfigEntry) -> None:
     async def refresh_live(call: ServiceCall) -> None:
         await _coords()[COORD_LIVE].async_request_refresh()
 
+    async def get_rider_profile(call: ServiceCall) -> ServiceResponse:
+        uuid = call.data.get("riders_api_uuid", "")
+        if not uuid:
+            return {"error": "riders_api_uuid manquant"}
+
+        profile = await _coords()[COORD_STANDINGS].async_get_rider_profile(uuid)
+        if profile is None:
+            return {"error": f"Profil introuvable pour {uuid}"}
+
+        return profile
+
     hass.services.async_register(DOMAIN, "refresh_config",    refresh_config)
     hass.services.async_register(DOMAIN, "refresh_standings", refresh_standings)
     hass.services.async_register(DOMAIN, "refresh_event",     refresh_event)
     hass.services.async_register(DOMAIN, "refresh_live",      refresh_live)
+    hass.services.async_register(DOMAIN, "get_rider_profile", get_rider_profile, supports_response=SupportsResponse.ONLY,)
     _LOGGER.debug("[MotoGP] Services enregistrés")

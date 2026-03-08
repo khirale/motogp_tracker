@@ -1,4 +1,3 @@
-"""Config Flow MotoGP Tracker — aucune configuration utilisateur requise."""
 from __future__ import annotations
 
 import voluptuous as vol
@@ -6,7 +5,6 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN
-
 
 class MotoGPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
