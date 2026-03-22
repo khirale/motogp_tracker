@@ -20,7 +20,7 @@ COORD_LIVE      = "live"
 
 SESSION_TYPES_KEPT = {"FP", "PR", "Q", "SPR", "RAC"}
 
-LIVE_STATUSES = {"started", "on track", "formation lap", "warm up lap", "in progress", "live"}
+LIVE_STATUSES = {"started", "on track", "formation lap", "warm up lap", "in progress", "live", "s"}
 
 CIRCUIT_SVG_PATH = "/local/motogp/circuits/{slug}-info.svg"
 
