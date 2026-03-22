@@ -1,7 +1,7 @@
 {
   "domain": "motogp_tracker",
   "name": "MotoGP Tracker",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "config_flow": true,
   "documentation": "https://github.com/khirale/motogp_tracker",
   "codeowners": ["@khirale"],
